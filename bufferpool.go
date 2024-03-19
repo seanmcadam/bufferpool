@@ -7,8 +7,8 @@ package bufferpool
 
 import "sync"
 
-const defaultPoolSize = 1
-const defaultBufSize = 1
+const DefaultPoolSize = 2
+const DefaultBufSize = 2048
 const maxBufSize = 2048
 
 type Pool struct {
@@ -28,7 +28,7 @@ type Buffer struct {
 func New() (p *Pool) {
 	p = &Pool{
 		pool: make([]*Buffer, 0),
-		ch:   make(chan *Buffer, defaultPoolSize),
+		ch:   make(chan *Buffer, DefaultPoolSize),
 	}
 
 	//
@@ -63,7 +63,7 @@ func (p *Pool) getpool() (b *Buffer) {
 		p.pool = append(p.pool[:len(p.pool)-1])
 	} else {
 		b = &Buffer{
-			data: make([]byte, 0, defaultBufSize),
+			data: make([]byte, 0, DefaultBufSize),
 			pool: p,
 		}
 		p.count++
