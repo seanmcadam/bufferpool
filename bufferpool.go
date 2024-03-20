@@ -146,11 +146,12 @@ func (b *Buffer) Copy() (copy *Buffer) {
 	return copy
 }
 
-func (b *Buffer) Append(d []byte) {
+func (b *Buffer) Append(d []byte) *Buffer {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
 	b.data = append(b.data, d...)
+	return b
 }
 
 func (b *Buffer) Data() (d []byte) {
