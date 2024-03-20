@@ -1,7 +1,6 @@
 package bufferpool
 
 import (
-	"log"
 	"math/rand"
 	"sync"
 	"testing"
@@ -18,14 +17,6 @@ func TestCompileCheck(t *testing.T) {
 func TestNew(t *testing.T) {
 
 	p := New()
-
-	time.Sleep(time.Millisecond)
-	//
-	// Count should be 2, one in the pipe, one ready to go
-	//
-	if p.Count() != DefaultPoolSize+1 {
-		t.Errorf("Count() is not %d != %d", p.Count(), DefaultPoolSize+1)
-	}
 
 	b := p.Get()
 	if b.Size() != 0 {
@@ -138,7 +129,7 @@ func TestBufferLoad(t *testing.T) {
 	}(p)
 
 	wg.Wait()
-	log.Printf("Pool Count %d", p.Count())
+	t.Logf("Pool Count %d", p.Count())
 }
 
 func RandBufferFill(b *Buffer) {

@@ -5,7 +5,11 @@ package bufferpool
 //
 //
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/seanmcadam/loggy"
+)
 
 const DefaultPoolSize = 2
 const DefaultBufSize = 2048
@@ -25,10 +29,14 @@ type Buffer struct {
 	used   bool
 }
 
-func New() (p *Pool) {
-	p = &Pool{
-		pool: make([]*Buffer, 0),
-		ch:   make(chan *Buffer, DefaultPoolSize),
+var globalPool *Pool
+var once sync.Once
+
+func initGlobalPool() {
+	p := &Pool{
+		count: 0,
+		pool:  make([]*Buffer, 0),
+		ch:    make(chan *Buffer, DefaultPoolSize),
 	}
 
 	//
@@ -41,16 +49,30 @@ func New() (p *Pool) {
 			}
 		}
 	}(p)
-	return p
+
+	globalPool = p
+
+}
+
+func New() *Pool {
+	once.Do(initGlobalPool)
+	return globalPool
 }
 
 func (p *Pool) Count() (c int) {
+	if p == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	return p.count
 }
 
 func (p *Pool) Get() (b *Buffer) {
+	if p == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	select {
 	case b := <-p.ch:
+		b.used = true
 		return b
 	}
 }
@@ -62,27 +84,27 @@ func (p *Pool) getpool() (b *Buffer) {
 		b = p.pool[len(p.pool)-1]
 		p.pool = append(p.pool[:len(p.pool)-1])
 	} else {
+		p.count++
 		b = &Buffer{
-			data: make([]byte, 0, DefaultBufSize),
-			pool: p,
+			used:   true,
+			data:   make([]byte, 0, DefaultBufSize),
+			pool:   p,
+			serial: p.count,
 		}
 		p.count++
 		b.serial = p.count
 	}
-	b.used = true
 	return b
 }
 
-//
 // putpool()
 // Return buffer back to the pool
 // unless the capacity has passed the max size
-//
 func (p *Pool) putpool(b *Buffer) {
 	if cap(b.data) > maxBufSize {
 		p.count--
 		if p.count < 0 {
-			panic("ran out of buffers")
+			loggy.FatalStack("ran out of buffers")
 		}
 		return
 	}
@@ -99,30 +121,48 @@ func (p *Pool) putpool(b *Buffer) {
 }
 
 func (b *Buffer) ReturnToPool() {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	if !b.used {
-		panic("Unused buffer return")
+		loggy.FatalStack("Unused buffer return")
 	}
 	b.pool.putpool(b)
 }
 
 func (b *Buffer) Size() int {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	return len(b.data)
 }
 
 func (b *Buffer) Copy() (copy *Buffer) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	copy = b.pool.getpool()
 	copy.Append(b.data)
 	return copy
 }
 
 func (b *Buffer) Append(d []byte) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	b.data = append(b.data, d...)
 }
 
 func (b *Buffer) Data() (d []byte) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	return b.data
 }
 
 func (b *Buffer) Serial() (s int) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
 	return b.serial
 }
