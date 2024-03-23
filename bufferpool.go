@@ -100,10 +100,16 @@ func (p *Pool) getpool() (b *Buffer) {
 // putpool()
 // Return buffer back to the pool
 // unless the capacity has passed the max size
-func (p *Pool) putpool(b *Buffer) {
+func (b *Buffer) putpool() {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
+	if b.pool == nil {
+		loggy.FatalStack("pool is nil")
+	}
 	if cap(b.data) > maxBufSize {
-		p.count--
-		if p.count < 0 {
+		b.pool.count--
+		if b.pool.count < 0 {
 			loggy.FatalStack("ran out of buffers")
 		}
 		return
@@ -114,10 +120,10 @@ func (p *Pool) putpool(b *Buffer) {
 		b.data[i] = 0
 	}
 	b.data = b.data[:0]
-	p.poolmx.Lock()
-	defer p.poolmx.Unlock()
+	b.pool.poolmx.Lock()
+	defer b.pool.poolmx.Unlock()
 	b.used = false
-	p.pool = append(p.pool, b)
+	b.pool.pool = append(b.pool.pool, b)
 }
 
 func (b *Buffer) ReturnToPool() {
@@ -127,21 +133,27 @@ func (b *Buffer) ReturnToPool() {
 	if !b.used {
 		loggy.FatalStack("Unused buffer return")
 	}
-	b.pool.putpool(b)
+	b.putpool()
 }
 
-func (b *Buffer) Size() int {
+func (b *Buffer) Size() (size int) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
-	return len(b.data)
+	if b.data == nil {
+		loggy.Errorf("Buffer Data Nil:%v", b)
+		size = 0
+	} else {
+		size = len(b.data)
+	}
+	return size
 }
 
 func (b *Buffer) Copy() (copy *Buffer) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
-	copy = b.pool.getpool()
+	copy = b.pool.Get()
 	copy.Append(b.data)
 	return copy
 }
