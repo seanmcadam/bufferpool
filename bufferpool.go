@@ -8,122 +8,187 @@ package bufferpool
 import (
 	"sync"
 
+	"github.com/seanmcadam/counter"
+	"github.com/seanmcadam/ctx"
 	"github.com/seanmcadam/loggy"
 )
 
-const DefaultPoolSize = 2
-const DefaultBufSize = 2048
-const maxBufSize = 2048
+const defaultPoolSize = 16
+const defaultMaxPoolSize uint = 1024
+const defaultLgBufSize uint = 2048
+const defaultMedBufSize uint = 512
+const defaultSmBufSize uint = 64
+const maxBufSize uint = 2048
 
-type Pool struct {
+type PoolSize struct {
 	poolmx sync.Mutex
 	pool   []*Buffer
 	ch     chan *Buffer
-	count  int
+	count  uint
+	max    uint
+}
+
+type Pool struct {
+	count uint
+	lg    *PoolSize
+	med   *PoolSize
+	sm    *PoolSize
 }
 
 type Buffer struct {
-	serial int
+	serial counter.Count
 	data   []byte
 	pool   *Pool
 	used   bool
 }
 
 var globalPool *Pool
+var bufferSerial counter.Counter
 var once sync.Once
 
+// --
+// --
 func initGlobalPool() {
+	bufferSerial = counter.New(ctx.New(), counter.BIT32)
 	p := &Pool{
-		count: 0,
-		pool:  make([]*Buffer, 0),
-		ch:    make(chan *Buffer, DefaultPoolSize),
+		lg: &PoolSize{
+			pool:  make([]*Buffer, 0),
+			ch:    make(chan *Buffer, defaultPoolSize),
+			count: 0,
+			max:   defaultLgBufSize,
+		},
+		med: &PoolSize{
+			pool:  make([]*Buffer, 0),
+			ch:    make(chan *Buffer, defaultPoolSize),
+			count: 0,
+			max:   defaultLgBufSize,
+		},
+		sm: &PoolSize{
+			pool:  make([]*Buffer, 0),
+			ch:    make(chan *Buffer, defaultPoolSize),
+			count: 0,
+			max:   defaultLgBufSize,
+		},
 	}
-
-	//
-	// Get a buffer ready for output -> out
-	//
-	go func(p *Pool) {
-		for {
-			select {
-			case p.ch <- p.getpool():
-			}
-		}
-	}(p)
+	p.lg.goChan()
+	p.med.goChan()
+	p.sm.goChan()
 
 	globalPool = p
 
 }
 
+// --
+//
+// --
 func New() *Pool {
 	once.Do(initGlobalPool)
 	return globalPool
 }
 
-func (p *Pool) Count() (c int) {
-	if p == nil {
-		loggy.FatalStack("nil method pointer")
-	}
+// --
+//
+// --
+func (p *Pool) Get() (b *Buffer) {
+	return p.GetLg()
+}
+
+// --
+//
+// --
+func (p *Pool) GetLg() (b *Buffer) {
+	return p.lg.getch()
+}
+
+// --
+//
+// --
+func (p *Pool) GetMed() (b *Buffer) {
+	return p.med.getch()
+}
+
+// --
+//
+// --
+func (p *Pool) GetSm() (b *Buffer) {
+	return p.sm.getch()
+}
+
+// --
+//
+// --
+func (p *Pool) Count() uint {
 	return p.count
 }
 
-func (p *Pool) Get() (b *Buffer) {
-	if p == nil {
+// --
+//
+// --
+func (p *Pool) newBuffer(size uint) (b *Buffer) {
+	p.count++
+	b = &Buffer{
+		serial: bufferSerial.Next(),
+		used:   true,
+		data:   make([]byte, 0, size),
+		pool:   p,
+	}
+	return b
+}
+
+// --
+// Pool Size
+// --
+func (ps *PoolSize) Count() uint {
+	return ps.count
+}
+
+// --
+//
+// --
+func (ps *PoolSize) getch() (b *Buffer) {
+	if ps == nil {
 		loggy.FatalStack("nil method pointer")
 	}
 	select {
-	case b := <-p.ch:
+	case b := <-ps.ch:
 		b.used = true
 		return b
 	}
 }
 
-func (p *Pool) getpool() (b *Buffer) {
-	if len(p.pool) > 0 {
-		p.poolmx.Lock()
-		defer p.poolmx.Unlock()
-		b = p.pool[len(p.pool)-1]
-		p.pool = append(p.pool[:len(p.pool)-1])
+// --
+//
+// --
+func (ps *PoolSize) get() (b *Buffer) {
+	if len(ps.pool) > 0 {
+		ps.poolmx.Lock()
+		defer ps.poolmx.Unlock()
+		b = ps.pool[len(ps.pool)-1]
+		ps.pool = append(ps.pool[:len(ps.pool)-1])
 	} else {
-		p.count++
-		b = &Buffer{
-			used:   true,
-			data:   make([]byte, 0, DefaultBufSize),
-			pool:   p,
-			serial: p.count,
-		}
-		p.count++
-		b.serial = p.count
+		b = globalPool.newBuffer(ps.max)
+		ps.count++
 	}
 	return b
 }
 
-// putpool()
-// Return buffer back to the pool
-// unless the capacity has passed the max size
-func (b *Buffer) putpool() {
-	if b == nil {
-		loggy.FatalStack("nil method pointer")
-	}
-	if b.pool == nil {
-		loggy.FatalStack("pool is nil")
-	}
-	if cap(b.data) > maxBufSize {
-		b.pool.count--
-		if b.pool.count < 0 {
-			loggy.FatalStack("ran out of buffers")
-		}
-		return
-	}
+// --
+//
+// --
+func (ps *PoolSize) put(b *Buffer) {
+	ps.poolmx.Lock()
+	defer ps.poolmx.Unlock()
+	ps.pool = append(ps.pool, b)
+}
 
-	// Zero out the buffer data
-	for i := range b.data {
-		b.data[i] = 0
-	}
-	b.data = b.data[:0]
-	b.pool.poolmx.Lock()
-	defer b.pool.poolmx.Unlock()
-	b.used = false
-	b.pool.pool = append(b.pool.pool, b)
+func (ps *PoolSize) goChan() {
+	go func(ps *PoolSize) {
+		for {
+			select {
+			case ps.ch <- ps.get():
+			}
+		}
+	}(ps)
 }
 
 func (b *Buffer) ReturnToPool() {
@@ -133,7 +198,27 @@ func (b *Buffer) ReturnToPool() {
 	if !b.used {
 		loggy.FatalStack("Unused buffer return")
 	}
-	b.putpool()
+	c := b.Cap()
+	if c > globalPool.med.max {
+		globalPool.lg.put(b)
+	} else if c > globalPool.sm.max {
+		globalPool.med.put(b)
+	} else {
+		globalPool.sm.put(b)
+	}
+}
+
+func (b *Buffer) Cap() (size uint) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
+	if b.data == nil {
+		loggy.Errorf("Buffer Data Nil:%v", b)
+		size = 0
+	} else {
+		size = uint(cap(b.data))
+	}
+	return size
 }
 
 func (b *Buffer) Size() (size int) {
@@ -175,6 +260,20 @@ func (b *Buffer) Append(d []byte) *Buffer {
 	return b
 }
 
+func (b *Buffer) Trim(c int) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
+	}
+	l := len(b.data)
+	if c > l {
+		loggy.FatalStack("not enough data to trim")
+	}
+	b.data = b.data[:l-c]
+}
+
 func (b *Buffer) Data() (d []byte) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
@@ -185,11 +284,11 @@ func (b *Buffer) Data() (d []byte) {
 	return b.data
 }
 
-func (b *Buffer) Serial() (s int) {
+func (b *Buffer) Serial() (s uint64) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
-	return b.serial
+	return b.serial.Uint()
 }
 
 func (b *Buffer) Used() bool {

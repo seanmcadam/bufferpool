@@ -28,11 +28,11 @@ func TestNew(t *testing.T) {
 		t.Errorf("Buf.Size() is not 1: %d", b.Size())
 	}
 
-	for i := 0; i < DefaultBufSize; i++ {
+	for i := 0; i < int(defaultLgBufSize); i++ {
 		b.Append([]byte("x"))
 	}
 
-	if b.Size() != DefaultBufSize+1 {
+	if b.Size() != int(defaultLgBufSize+1) {
 		t.Errorf("Buf.Size() is not 1: %d", b.Size())
 	}
 
@@ -42,9 +42,9 @@ func TestNew(t *testing.T) {
 
 func TestBufferNew(t *testing.T) {
 
-	const hithere = "Hi There"
+	const hithere = "Hi There........................................................................................................................................................."
 	p := New()
-	b := p.Get()
+	b := p.GetSm()
 
 	b.Append([]byte(hithere))
 	if b.Size() != len(hithere) {
@@ -52,14 +52,26 @@ func TestBufferNew(t *testing.T) {
 	}
 
 	b.ReturnToPool()
-	p.Get().ReturnToPool()
-	p.Get().ReturnToPool()
-	p.Get().ReturnToPool()
-	p.Get().ReturnToPool()
-	p.Get().ReturnToPool()
-	p.Get().ReturnToPool()
+	p.GetLg().ReturnToPool()
+	p.GetLg().ReturnToPool()
+	p.GetLg().ReturnToPool()
+	p.GetLg().ReturnToPool()
+	p.GetLg().ReturnToPool()
+	p.GetLg().ReturnToPool()
+	p.GetMed().ReturnToPool()
+	p.GetMed().ReturnToPool()
+	p.GetMed().ReturnToPool()
+	p.GetMed().ReturnToPool()
+	p.GetMed().ReturnToPool()
+	p.GetMed().ReturnToPool()
+	p.GetSm().ReturnToPool()
+	p.GetSm().ReturnToPool()
+	p.GetSm().ReturnToPool()
+	p.GetSm().ReturnToPool()
+	p.GetSm().ReturnToPool()
+	p.GetSm().ReturnToPool()
 
-	b = p.Get()
+	b = p.GetSm()
 	b.Append([]byte(hithere))
 	b.Append([]byte(hithere))
 	b.Append([]byte(hithere))
