@@ -140,6 +140,9 @@ func (b *Buffer) Size() (size int) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
+	}
 	if b.data == nil {
 		loggy.Errorf("Buffer Data Nil:%v", b)
 		size = 0
@@ -153,6 +156,9 @@ func (b *Buffer) Copy() (copy *Buffer) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
+	}
 	copy = b.pool.Get()
 	copy.Append(b.data)
 	return copy
@@ -162,6 +168,9 @@ func (b *Buffer) Append(d []byte) *Buffer {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
+	}
 	b.data = append(b.data, d...)
 	return b
 }
@@ -169,6 +178,9 @@ func (b *Buffer) Append(d []byte) *Buffer {
 func (b *Buffer) Data() (d []byte) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
+	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
 	}
 	return b.data
 }
@@ -178,4 +190,11 @@ func (b *Buffer) Serial() (s int) {
 		loggy.FatalStack("nil method pointer")
 	}
 	return b.serial
+}
+
+func (b *Buffer) Used() bool {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
+	return b.used
 }
