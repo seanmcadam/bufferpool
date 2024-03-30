@@ -156,3 +156,55 @@ func getRandomPrintableChar() []byte {
 	b[0] = byte(rand.Intn(94) + 32)
 	return b
 }
+
+func TestBufferQty(t *testing.T) {
+	pool := New()
+
+	var bufsm []*Buffer = make([]*Buffer,0,defaultPoolSize)
+	var bufmed []*Buffer = make([]*Buffer,0,defaultPoolSize)
+	var buflg []*Buffer = make([]*Buffer,0,defaultPoolSize)
+
+	for i := 0; i < defaultPoolSize; i++ {
+		bufsm = append(bufsm, pool.GetSm())
+		bufmed = append(bufmed, pool.GetMed())
+		buflg = append(buflg, pool.GetLg())
+	}
+
+	for _, b := range bufsm {
+		b.ReturnToPool()
+	}
+	for _, b := range bufmed {
+		b.ReturnToPool()
+	}
+	for _, b := range buflg {
+		b.ReturnToPool()
+	}
+
+}
+
+
+func TestBufferMethods(t *testing.T) {
+	pool := New()
+
+	b := pool.Get()
+	
+	b.Append([]byte("testing"))
+	b.Trim(5)
+	if b.Size() != 2 {
+		t.Errorf("Trim() size != 2")
+	}
+
+	b1 := b.Data()
+	if string(b1) != "te" {
+		t.Errorf("Data != 'te'")
+	}
+
+	_ = b.Serial()
+
+	if !b.Used() {
+		t.Errorf("Buffer is not marked used")
+	}
+
+	b.ReturnToPool()
+
+}
