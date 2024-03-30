@@ -160,9 +160,9 @@ func getRandomPrintableChar() []byte {
 func TestBufferQty(t *testing.T) {
 	pool := New()
 
-	var bufsm []*Buffer = make([]*Buffer,0,defaultPoolSize)
-	var bufmed []*Buffer = make([]*Buffer,0,defaultPoolSize)
-	var buflg []*Buffer = make([]*Buffer,0,defaultPoolSize)
+	var bufsm []*Buffer = make([]*Buffer, 0, defaultPoolSize)
+	var bufmed []*Buffer = make([]*Buffer, 0, defaultPoolSize)
+	var buflg []*Buffer = make([]*Buffer, 0, defaultPoolSize)
 
 	for i := 0; i < defaultPoolSize; i++ {
 		bufsm = append(bufsm, pool.GetSm())
@@ -182,20 +182,35 @@ func TestBufferQty(t *testing.T) {
 
 }
 
-
 func TestBufferMethods(t *testing.T) {
 	pool := New()
 
 	b := pool.Get()
-	
+
 	b.Append([]byte("testing"))
-	b.Trim(5)
+	b1 := b.PeekByte()
+	if b1 != byte('g') {
+		t.Errorf("PeekByte() != g")
+	}
+
+	b2 := b.TrimByte()
+	if b2 != byte('g') {
+		t.Errorf("TrimByte() != g")
+	}
+	if b.Size() != 6 {
+		t.Errorf("Trim() size != 6")
+	}
+
+	b3 := b.Trim(4)
+	if string(b3) != "stin" {
+		t.Errorf("Trim(4) != stin")
+	}
 	if b.Size() != 2 {
 		t.Errorf("Trim() size != 2")
 	}
 
-	b1 := b.Data()
-	if string(b1) != "te" {
+	b4 := b.Data()
+	if string(b4) != "te" {
 		t.Errorf("Data != 'te'")
 	}
 

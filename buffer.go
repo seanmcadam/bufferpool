@@ -83,7 +83,7 @@ func (b *Buffer) Append(d []byte) *Buffer {
 	return b
 }
 
-func (b *Buffer) Trim(c int) {
+func (b *Buffer) Trim(c int) (ret []byte) {
 	if b == nil {
 		loggy.FatalStack("nil method pointer")
 	}
@@ -97,7 +97,46 @@ func (b *Buffer) Trim(c int) {
 	if b.Size() < c {
 		loggy.FatalfStack("trim size:%d > buffer size:%d", c, b.Size())
 	}
+	ret = b.data[l-c:]
 	b.data = b.data[:l-c]
+	return ret
+}
+
+func (b *Buffer) TrimByte() (ret byte) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
+	}
+	l := len(b.data)
+	if 1 > l {
+		loggy.FatalStack("not enough data to trim")
+	}
+	if b.Size() == 0 {
+		loggy.FatalfStack("buffer is empty")
+	}
+	ret = b.data[l-1]
+	b.data = b.data[:l-1]
+	return ret
+}
+
+func (b *Buffer) PeekByte() (ret byte) {
+	if b == nil {
+		loggy.FatalStack("nil method pointer")
+	}
+	if b.used == false {
+		loggy.FatalStack("inactive buffer")
+	}
+	l := len(b.data)
+	if 1 > l {
+		loggy.FatalStack("not enough data to trim")
+	}
+	if b.Size() == 0 {
+		loggy.FatalfStack("buffer is empty")
+	}
+	ret = b.data[l-1]
+	return ret
 }
 
 func (b *Buffer) Data() (d []byte) {
